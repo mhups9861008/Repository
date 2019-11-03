@@ -1,0 +1,282 @@
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body> 
+<div id="info">↑ ↓ ← → to move
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/109/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/MTLLoader.js" ></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/OBJLoader.js" ></script>
+<script>
+var camera, scene, renderer, mesh, controls, orthoCam, targetSize=40;
+var keyboard = new KeyboardState();
+var clock;
+
+var car=new THREE.Group(), carWidth = 40, carHeight = 6, carDepth = 40, theObject, object;
+var pos = new THREE.Vector3();
+var speed, angle, vel, barRadius = [], bar = [];
+init();
+(function() {
+  Math.clamp = function(val,min,max){
+    return Math.min(Math.max(val,min),max);
+    
+  }})();
+function readModel(modelName='toycar', targetSize = 40) {
+
+        var onProgress = function(xhr) {
+          if (xhr.lengthComputable) {
+            var percentComplete = xhr.loaded / xhr.total * 100;
+            console.log(Math.round(percentComplete, 2) + '% downloaded');
+          }
+        };
+
+        var onError = function(xhr) {};
+
+        var mtlLoader = new THREE.MTLLoader();
+        mtlLoader.load(modelName + '.mtl', function(materials) {
+
+          materials.preload();
+
+          var objLoader = new THREE.OBJLoader();
+          objLoader.setMaterials(materials);
+          objLoader.load(modelName + '.obj', function(object) {
+
+            unitize(object, targetSize);
+            //theObject.add ( new THREE.BoxHelper (theObject) )
+            theObject.name = 'OBJ'
+            car.add (theObject);
+            theObject.setRotationFromEuler(new THREE.Euler(3.1416 / 2, 0, -3.1416 / 2, 'ZYX'))
+          }, onProgress, onError);
+
+
+        });
+
+      }
+
+function unitize (object, targetSize=40) {  
+	
+	// find bounding box of 'object'
+	var box3 = new THREE.Box3();
+	box3.setFromObject (object);
+	var size = new THREE.Vector3();
+	size.subVectors (box3.max, box3.min);
+	var center = new THREE.Vector3();
+	center.addVectors(box3.max, box3.min).multiplyScalar (0.5);
+	
+	console.log ('center: ' + center.x + ', '+center.y + ', '+center.z );
+	console.log ('size: ' + size.x + ', ' +  size.y + ', '+size.z );
+	
+	// uniform scaling according to objSize
+	var objSize = Math.max (size.x, size.y, size.z);
+	var scaleSet = targetSize/objSize;
+				
+	 theObject =  new THREE.Object3D();
+	theObject.add (object);
+	object.scale.set (scaleSet, scaleSet, scaleSet);
+	object.rotation.set(Math.PI, 0, Math.PI/2);
+	object.position.set (-center.x*scaleSet, -center.y*scaleSet, -center.z*scaleSet);
+	return theObject;
+			
+}
+  
+
+animate();
+
+function init() {
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.z = 500;
+  orthoCam = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+	//orthoCam.position.y=500;
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  renderer.autoClear = false;
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  
+  controls.enableKeys = false;
+  
+  document.body.appendChild(renderer.domElement);
+  ////////////////////////////////////////////////////////////////////////
+  THREE.ImageUtils.crossOrigin = '';
+  var pTexture = THREE.ImageUtils.loadTexture("https://410606121.github.io/Repository/images.png");
+  var plane = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshLambertMaterial({
+  	map:pTexture,
+    side:THREE.DoubleSide}));
+  plane.rotation.x = -Math.PI/2;
+  scene.add(plane);
+  
+  speed = 0.0;
+  angle = 0.0;
+  theObject = new THREE.Object3D();
+    readModel();
+  
+  scene.add(car);
+	var barM = new THREE.MeshLambertMaterial({
+  	color: 0x0066FF
+  });
+  
+  barRadius[0] = 10;
+	bar[0] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[0], barRadius[0], 100, 20), barM.clone());
+  bar[0].position.set(30, 50, 90);
+  barRadius[1] = 20;
+	bar[1] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[1], barRadius[1], 50, 20), barM.clone());
+  bar[1].position.set(-80, 25, 60);
+  barRadius[2] = 15;
+	bar[2] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[2], barRadius[2], 80, 20), barM.clone());
+  bar[2].position.set(100, 40, 80);
+  barRadius[3] = 18;
+	bar[3] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[3], barRadius[3], 120, 20), barM.clone());
+  bar[3].position.set(-160, 60, 20);
+  barRadius[4] = 18;
+	bar[4] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[4], barRadius[4], 75, 20), barM.clone());
+  bar[4].position.set(-160, 37.5, -90);
+  barRadius[5] = 25;
+	bar[5] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[5], barRadius[5], 60, 20), barM.clone());
+  bar[5].position.set(60, 30, -70);
+  barRadius[6] = 17;
+	bar[6] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[6], barRadius[6], 90, 20), barM.clone());
+  bar[6].position.set(40, 45, -170);
+  barRadius[7] = 17;
+	bar[7] = new THREE.Mesh(new THREE.CylinderGeometry(barRadius[7], barRadius[7], 85, 20), barM.clone());
+  bar[7].position.set(80, 42.5, -120);
+  readModel();
+  
+  for(var key in bar){
+  	scene.add(bar[key]);
+  }
+  var light = new THREE.PointLight(0xffffff);
+  light.position.set(100, 300, 200);
+  scene.add(light);
+}
+
+function checkIntersect(rect, circle) {
+  var rad2 = circle.r * circle.r;
+  var max = rect.max.clone().sub(circle.c);
+  var min = rect.min.clone().sub(circle.c);
+  
+  if (max.x < 0) {
+  	if (max.z < 0)
+    	return (max.x*max.x + max.z*max.z < rad2);
+    else if (min.z > 0)
+    	return (max.x*max.x + min.z*min.z < rad2);
+    else
+    	return (Math.abs(max.x) < circle.r);
+  } else if (min.x > 0) {
+  	if (max.z < 0)
+    	return (min.x*min.x + max.z*max.z < rad2);
+    else if (min.z > 0)
+    	return (min.x*min.x + min.z*min.z < rad2);
+    else
+    	return (min.x < circle.r);
+  } else {
+  	if (max.z < 0)
+    	return (Math.abs(max.z) < circle.r);
+    else if (min.z > 0)
+    	return (min.z < circle.r);
+    else
+    	return true;
+  }
+}
+
+function checkHit(carTmp){
+	var hit = false;
+	var rect = {};
+  var p = carTmp.worldToLocal(carTmp.position.clone());
+  rect.max = p.clone().add (new THREE.Vector3(carWidth/2, 0, carDepth/2));
+  rect.min = p.clone().sub (new THREE.Vector3(carWidth/2, 0, carDepth/2));
+	for(var key in bar){
+    var circ = {};
+    circ.c = carTmp.worldToLocal(bar[key].position.clone());
+    circ.r = barRadius[key];
+    if(checkIntersect(rect, circ)){
+    	hit = true;
+      //bar[key].material.color = new THREE.Color(0xFF0000); 
+      console.log(rect);
+      console.log(circ);
+      break;
+    }
+    /*else
+    	bar[key].material.color = new THREE.Color(0x8888FF);*/
+  }
+  return hit;
+}
+
+function update(dt) {
+	var carTmp = car.clone();
+  keyboard.update();
+	if ( keyboard.pressed("left") ) 
+		angle += 0.01;               
+	if ( keyboard.pressed("right") )
+		angle -= 0.01;               
+	if ( keyboard.pressed("up") )  
+		speed += 0.5;        
+	if ( keyboard.pressed("down") )  
+		speed -= 0.5;    
+
+  if(checkHit(carTmp)){
+  	speed = Math.clamp (speed, -20, 0);
+  }
+  else{
+  	speed = Math.clamp (speed, -20, 20.0);
+  }
+	vel = new THREE.Vector3(speed,0,0);
+	
+	vel.applyAxisAngle (new THREE.Vector3(0,1,0), angle);
+	pos.add (vel.clone().multiplyScalar(dt));
+  
+}
+
+function animate() {
+  controls.update();
+
+  var dt = clock.getDelta();
+  var carTmp = car.clone();
+  update(dt);
+
+  // car update
+  car.position.copy(pos);
+  car.rotation.y = angle;
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.clear();
+  let WW=window.innerWidth;
+  let HH=window.innerHeight;
+  renderer.setViewport(0, 0, WW/2, HH);
+  camera.aspect= WW/2/HH;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  renderer.setViewport(WW/2, 0, WW/2, HH);
+  orthoCam.position.set(car.position.x, 80, car.position.z);
+  orthoCam.up.set(0, 0, -1);
+  orthoCam.lookAt(car.position);
+  renderer.render(scene, orthoCam);
+}
+
+</script>
+</body>
+
+</html>
