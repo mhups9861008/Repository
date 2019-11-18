@@ -104,6 +104,7 @@ function unitize(object, targetSize = 100) {
   object.traverse(function(child) {
     if (child instanceof THREE.Mesh) {
       child.castShadow = true;
+      child.receiveShadow = true;
     }
   });
   object.scale.set(scaleSet, scaleSet, scaleSet);
