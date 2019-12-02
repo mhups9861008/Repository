@@ -286,6 +286,10 @@ THREE.OrbitControls = function ( object, domElement ) {
 
 	var EPS = 0.000001;
 
+	// current position in spherical coordinates
+	var spherical = new THREE.Spherical();
+	var sphericalDelta = new THREE.Spherical();
+
 	var scale = 1;
 	var panOffset = new THREE.Vector3();
 	var zoomChanged = false;
