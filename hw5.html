@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+#teapotNum {
+  position: absolute;
+  top: 40px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body> 
+<div id="info">
+hw5<br/>
+右鍵產生茶壺左鍵toggle<br/>
+</div>
+<div id="teapotNum"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r75/three.min.js"></script>
+<script src="https://410606121.github.io/Repository/Ob.js"></script>
+</script>
+    
+<script id="myVertexShader" type="x-shader/x-vertex">
+  uniform vec3 lightpos;  // world coordinate
+  varying vec3 eyelightdir;
+  varying vec3 eyenormal;    
+  varying vec4 eyepos;
+    
+  void main() {
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    eyepos = modelViewMatrix * vec4 (position, 1.0);
+    vec4 eyelightpos= viewMatrix * vec4 (lightpos, 1.0);
+    eyelightdir = normalize (eyelightpos.xyz - eyepos.xyz);
+    eyenormal = normalMatrix * normal;
+  }
+</script>
+<script id="myFragmentShader" type="x-shader/x-fragment">
+  varying vec3 eyelightdir;
+  varying vec3 eyenormal;
+  varying vec4 eyepos;
+  uniform float opacity;
+  void main() {
+  	// gooch shader
+  	vec3 cool = vec3(0.1, 0, 0.5);
+    vec3 warm = vec3(0.5, 0.5, 0.1);
+    float alpha = 0.5;
+    float beta = 0.5;
+    float intensity = dot (normalize (eyenormal), normalize (eyelightdir));    
+    vec3 diffuse = vec3(1, 1, 1);
+    vec3 cdiff = cool + alpha*diffuse;
+    vec3 wdiff = warm + beta*diffuse;
+    vec3 final = (1.0+intensity)/2.0*wdiff + (1.0-(1.0+intensity)/2.0)*cdiff;
+		vec3 h = normalize(-normalize (eyepos.xyz) + normalize (eyelightdir));
+    float shininess = 40.;    
+    vec3 specular = pow (dot (eyenormal, h), shininess) *vec3 (1,0,0);
+    gl_FragColor = vec4(final + specular, opacity);
+  }
+</script>
+
+<script>
+var scene, renderer, light, sphere;
+var raycaster;
+var mouse = new THREE.Vector2();
+var pickables = [], pickables2 = [], teapots = [];
+var pointLight, lightSphere, teapotMesh, teapotMaterial;
+var scene0, sceneRTT, cameraRTT, material_shh_normal, material_shh, rtTexture, bs; 
+var angle = 0, num = 0, teapotNum = 0;
+var camera, controls;
+// Teapot constructor
+var Teapot = function (mesh) {
+	  this.mesh = mesh;
+		pickables2.push (mesh);
+		this.mesh.name = 't'+ num; 
+    num++;
+    teapotNum++;
+    this.angle = 0;
+    this.turnSpeed = 0.3;
+    this.turn = true;
+    this.life = 100;
+    this.alpha = 1.0;
+    
+    this.meshSil = mesh.clone();
+    scene0.add(this.meshSil);
+};
+function findTeapot(mesh) {
+	for (var i = 0; i < teapots.length; i++) {
+  	if (teapots[i].mesh === mesh)
+    	return teapots[i];
+  }
+}
+// method of Person
+Teapot.prototype.update = function () {
+  if (this.turn) {
+    this.angle += this.turnSpeed;
+  }
+  this.mesh.rotation.y = this.angle;
+  this.meshSil.rotation.y = this.angle;
+  
+  this.life -= 0.3;
+  if(this.life < 0)
+    this.expire();
+  this.turnSpeed /= 1.01;
+  
+  this.alpha -= 0.0025;
+  this.mesh.material.uniforms.opacity.value = this.alpha;
+  this.mesh.material.uniforms.lightpos.value.copy(pointLight.position);  
+  this.meshSil.material.uniforms.opacity.value = this.alpha;
+};
+Teapot.prototype.expire = function () {
+	scene.remove(this.mesh);
+  teapotNum--;
+  teapots.shift();   // delete the first object in teapots[], like pop_front()
+  pickables2.shift();
+  scene0.remove(this.meshSil);
+}
+init();
+animate();
+function init() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.set(0, 150, 250);
+	
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+  window.addEventListener('resize', onWindowResize, false);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  //////////////////////////////////////////////////////////
+  // ground
+	var ground = new THREE.Mesh (new THREE.PlaneGeometry (200,200),
+  new THREE.MeshNormalMaterial());
+  scene.add (ground);
+  ground.rotation.x = -Math.PI/2;
+  pickables.push(ground);
+  
+  // platform
+  var platform = new THREE.Mesh (new THREE.BoxGeometry (60,15,200),
+  new THREE.MeshNormalMaterial());
+	platform.position.set (70,7.5,0);
+  var platform2 = new THREE.Mesh (new THREE.BoxGeometry (50,20,70),
+  new THREE.MeshNormalMaterial());
+  platform2.rotation.y = Math.PI/2;
+  platform2.position.set (-65,10,-75);
+  scene.add (platform);
+  scene.add (platform2);
+  pickables.push(platform);
+  pickables.push(platform2);
+  
+  // point light
+  pointLight = new THREE.PointLight(0xffffff);
+  scene.add(pointLight);
+  lightSphere = new THREE.Mesh(new THREE.SphereGeometry(5), new THREE.MeshBasicMaterial({
+    color: 0xffff00,
+    wireframe: true
+  }));
+  scene.add(lightSphere);
+  
+  // teapot
+  var jsonLoader = new THREE.JSONLoader();
+  var url = "https://410606121.github.io/Repository/teapot.json";
+  teapotMaterial = new THREE.ShaderMaterial({
+  		transparent: true,
+      uniforms: {
+        lightpos: {type: 'v3', value: pointLight.position},
+        opacity: {type: 'f', value: 1.0}
+      },
+      vertexShader: document.getElementById('myVertexShader').textContent,
+      fragmentShader: document.getElementById('myFragmentShader').textContent
+    });
+  jsonLoader.load(url, function(geometry, materials) {
+  	teapotMesh = new THREE.Mesh(geometry, teapotMaterial);
+    teapotMesh.scale.set(5, 5, 5);
+  });
+  scene0 = new THREE.Scene();
+	// texture on the board
+  rtTexture = new THREE.WebGLRenderTarget( 
+   	1024,1024,  // size of the FBO
+		{ minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } 
+		);
+	material_shh = new THREE.ShaderMaterial({
+  	transparent: true,
+    side: THREE.DoubleSide,
+    uniforms: {
+      imageSize: {type: 'i', value: 256},
+      texture: {type: 't', value: rtTexture}
+    }
+  });
+  bs = new THREE.Mesh(new THREE.PlaneGeometry(100,100), material_shh);
+  sceneRTT = new THREE.Scene();
+  cameraRTT = new THREE.OrthographicCamera(-50, 50, 50, -50, -10, 10);     // make the bs cover the whole screen
+  sceneRTT.add(bs);
+  
+	raycaster = new THREE.Raycaster();
+  document.addEventListener('mousedown', onDocumentMouseDown, false);
+}
+function onDocumentMouseDown(event) {
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+	if(event.which == 3){			// mouse right key
+    var intersects = raycaster.intersectObjects(pickables);
+    if (intersects.length > 0) {  // inside picking plane
+      var origin = new THREE.Vector3();
+      origin.copy (intersects[0].point);
+      origin.y = 100;
+      raycaster.set (origin, new THREE.Vector3(0,-1,0));
+      intersects = raycaster.intersectObjects (scene.children);
+      if (intersects.length > 0) {
+      	if(teapotMesh !== undefined){
+        	var mesh = teapotMesh.clone();		// use clone to save memory
+          mesh.material = teapotMaterial.clone();
+          var teapot = new Teapot(mesh);
+          scene.add(mesh);
+          teapots.push(teapot);
+          teapot.mesh.position.copy (intersects[0].point);
+          teapot.meshSil.position.copy (intersects[0].point);
+        }
+      }
+    }
+  }
+  else if(event.which == 1){     // mouse left key
+    var intersects = raycaster.intersectObjects(pickables2);
+  	if (intersects.length > 0) {
+			// [ { distance, point, face, faceIndex, indices, object }, ... ]
+        var teapot = findTeapot (intersects[0].object);
+        teapot.turn = !teapot.turn;
+    }	
+  }
+}
+function animate() {
+  controls.update();
+  angle += 0.01;
+  
+  // point light around
+  pointLight.position.set(50 * Math.cos(angle), 80, 50 * Math.sin(angle));
+  lightSphere.position.copy(pointLight.position);
+  
+  // teapot update
+  for (var i = 0; i < teapots.length; i++) {
+  	teapots[i].update();
+  }
+  
+  document.getElementById("teapotNum").innerHTML =	"Teapot Number: " + teapotNum;
+  
+  renderer.clear(true);
+ 	// draw normal shader
+  renderer.render (scene0, camera, rtTexture, true);
+  // put the after-Laplace-filter-scene to the screen (silhouette)
+  renderer.render (sceneRTT, cameraRTT);
+  renderer.render(scene, camera);
+  
+  requestAnimationFrame(animate);
+}
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
+
+</body>
+
+</html>
