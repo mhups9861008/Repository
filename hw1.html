@@ -26,20 +26,11 @@ body {
   <button id="toggle" style="width:20%">Toggle Turn</button>
   <button id="analog" style="width:20%">Analog</button>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/107/three.min.js"></script>
 <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
-<script async src="https://unpkg.com/es-module-shims@1.7.0/dist/es-module-shims.js"></script>
-<script type="importmap">
-	{
-	"imports": {
-		"three": "https://unpkg.com/three@0.150.1/build/three.module.js",
-		"three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
-	}
-	}
-</script>
-<script type="module">
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
 
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+<script>
 var renderer, scene, camera, choice = 0, t=0;
 var controls, cube, turn = false, circle, box;
 var angle = 0,
@@ -71,12 +62,12 @@ function initial() {
   scene = new THREE.Scene();
 
   var grid = new THREE.GridHelper(20, 20, 0xaaaa00, 0x333333);
-  var axes = new THREE.AxesHelper(5);
+  var axes = new THREE.AxisHelper(5);
 
   camera = new THREE.PerspectiveCamera(40, width / height, 1, 1000);
   camera.position.y = 80;
 
-  controls = new OrbitControls(camera, renderer.domElement);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
   window.addEventListener('resize', onWindowResize, false);
 
   cube = new THREE.Mesh(new THREE.BoxGeometry(0, 0, 16), new THREE.MeshNormalMaterial());
